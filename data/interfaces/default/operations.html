@@ -1,0 +1,43 @@
+<%inherit file="base.html"/>
+<%!
+    import cherrystrap
+%>
+
+<%def name="body()">
+
+<div class="row">
+  <div class="col-sm-12">
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+        <h3 class="panel-title">Bulk Delete Worklogs</h3>
+      </div>
+      <div class="panel-body">
+        <form id="bulk-delete-worklogs" action="operations" method="POST">
+          <div class="input-group">
+            <input type="hidden" name="script" value="bulk-delete-worklogs">
+            <span class="input-group-addon">Issue ID/s</span>
+            <input type="textarea" class="form-control" name="issue_list_input" placeholder="JIRA-001, JIRA-002, JIRA-003...">
+            <span class="input-group-btn"><button class="btn btn-success" type="submit">Go</button></span>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+</%def>
+
+<%def name="headIncludes()">
+</%def>
+
+<%def name="javascriptIncludes()">
+<script type="text/javascript">
+  %if status and status_msg:
+    %if status=="success":
+      $(".ajaxMsg").html('<div class="alert alert-success">${status_msg}</div>').show().fadeOut(5000);
+    %elif status=="failure":
+      $(".ajaxMsg").html('<div class="alert alert-danger">${status_msg}</div>').show().fadeOut(5000);
+    %endif
+  %endif
+</script>
+</%def>

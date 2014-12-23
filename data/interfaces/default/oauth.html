@@ -1,0 +1,19 @@
+<%inherit file="base.html"/>
+<%!
+    import cherrystrap
+%>
+
+<%def name="body()">
+
+<p>Access OAuth Token: ${access_token_info['oauth_token']}</p>
+<p>Access OAuth Token Secret: ${access_token_info['oauth_token_secret']}</p>
+
+<p>${content}</p>
+
+</%def>
+
+<%def name="headIncludes()">
+</%def>
+
+<%def name="javascriptIncludes()">
+</%def>
