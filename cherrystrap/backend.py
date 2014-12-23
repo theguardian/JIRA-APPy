@@ -10,6 +10,7 @@ import cherrystrap
 from cherrystrap import logger
 
 def redirect_oauth():
+
     consumer = oauth.Consumer(cherrystrap.CONSUMER_KEY, cherrystrap.CONSUMER_SECRET)
     client = oauth.Client(consumer)
     client.set_signature_method(SignatureMethod_RSA_SHA1())
@@ -166,15 +167,13 @@ class SignatureMethod_RSA_SHA1(oauth.SignatureMethod):
         try:
             with open(cherrystrap.RSA_PRIVATE_KEY, 'r') as f:
                 data = f.read()
+            privateKeyString = data.strip()
+            privatekey = keyfactory.parsePrivateKey(privateKeyString)
+            signature = str(privatekey.hashAndSign(raw))
+            return base64.b64encode(signature)
         except:
             logger.warn('Private Key File not found on server at location %s' % cherrystrap.RSA_PRIVATE_KEY)
 
-        privateKeyString = data.strip()
-
-        privatekey = keyfactory.parsePrivateKey(privateKeyString)
-        signature = str(privatekey.hashAndSign(raw))
-
-        return base64.b64encode(signature)
 
 def ajaxMSG(status, status_msg):
     if status == 'success':

@@ -53,8 +53,12 @@ class WebInterface(object):
 	index.exposed=True
 
 	def oauth_request(self):
-		authorize_token_url = backend.redirect_oauth()
-		raise cherrypy.HTTPRedirect(authorize_token_url)
+		try:
+			authorize_token_url = backend.redirect_oauth()
+			raise cherrypy.HTTPRedirect(authorize_token_url)
+		except:
+			status, status_msg = backend.ajaxMSG('failure', 'Invalid Consumer Key, RSA Keys, or JIRA App Link - please check configuration')
+			return serve_template(templatename="index.html", title="Home", status=status, status_msg=status_msg)
 	oauth_request.exposed = True
 
 	def oauth_logout(self):
