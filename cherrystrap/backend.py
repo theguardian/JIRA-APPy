@@ -18,18 +18,25 @@ def redirect_oauth():
     request_token_url = os.path.join(cherrystrap.JIRA_BASE_URL, 'plugins/servlet/oauth/request-token')
     authorize_url = os.path.join(cherrystrap.JIRA_BASE_URL, 'plugins/servlet/oauth/authorize')
 
-    resp, content = client.request(request_token_url, "POST")
-    if resp['status'] != '200':
-        logger.warn("Invalid response %s: %s" % (resp['status'],  content))
-    else:
-        request_token = dict(urlparse.parse_qsl(content))
-        request_token_info = {
-            "oauth_token": request_token['oauth_token'],
-            "oauth_token_secret": request_token['oauth_token_secret'],
-            "authorize_token_url": "%s?oauth_token=%s" % (authorize_url, request_token['oauth_token'])
-        }
+    try:
+        resp, content = client.request(request_token_url, "POST")
+        if resp['status'] != '200':
+            authorize_token_url = "home"
+            status, status_msg = ajaxMSG('failure', 'Invalid Consumer Key, RSA Keys, or JIRA App Link - please check configuration')
+        else:
+            request_token = dict(urlparse.parse_qsl(content))
+            request_token_info = {
+                "oauth_token": request_token['oauth_token'],
+                "oauth_token_secret": request_token['oauth_token_secret'],
+                "authorize_token_url": "%s?oauth_token=%s" % (authorize_url, request_token['oauth_token'])
+            }
+            authorize_token_url = request_token_info['authorize_token_url']
+            status, status_msg = ajaxMSG('success', 'JIRA Credentials recognized! Redirecting to JIRA login')
+    except:
+        authorize_token_url = "home"
+        status, status_msg = ajaxMSG('failure', 'Invalid Consumer Key, RSA Keys, or JIRA App Link - please check configuration')
 
-    return request_token_info['authorize_token_url']
+    return authorize_token_url, status, status_msg
 
 def request_oauth(oauth_token):
     consumer = oauth.Consumer(cherrystrap.CONSUMER_KEY, cherrystrap.CONSUMER_SECRET)
@@ -65,8 +72,7 @@ def validate_oauth(oauth_token):
         cherrystrap.config_write()
         cherrystrap.JIRA_LOGIN_STATUS = None
         cherrystrap.JIRA_LOGIN_USER = None
-        logger.warn("Invalid response %s: %s" % (resp['status'],  content))
-        status_msg = "Could not handshake with JIRA Server. Tokens reset"
+        status, status_msg = ajaxMSG('failure', 'Could not handshake with JIRA Server. Tokens reset')
     else:
         resp_dict = json.loads(content)
         cherrystrap.JIRA_OAUTH_TOKEN = access_token['oauth_token']
@@ -74,10 +80,9 @@ def validate_oauth(oauth_token):
         cherrystrap.config_write()
         cherrystrap.JIRA_LOGIN_STATUS = True
         cherrystrap.JIRA_LOGIN_USER = resp_dict['name']
-        logger.info("JIRA OAuth Tokens successfully saved to configuration file")
-        status_msg = "JIRA OAuth Tokens successfully saved to configuration file"
+        status, status_msg = ajaxMSG('success', 'JIRA OAuth Tokens successfully saved to configuration file')
 
-    return status_msg
+    return status, status_msg
 
 def stored_oauth():
     consumer = oauth.Consumer(cherrystrap.CONSUMER_KEY, cherrystrap.CONSUMER_SECRET)
@@ -99,7 +104,7 @@ def check_oauth():
     if resp['status'] != '200':
         cherrystrap.JIRA_LOGIN_STATUS = None
         cherrystrap.JIRA_LOGIN_USER = None
-        logger.warn("Invalid response %s: %s" % (resp['status'],  content))
+        logger.warn("OAuth credentials missing or invalid")
     else:
         resp_dict = json.loads(content)
         cherrystrap.JIRA_LOGIN_STATUS = True

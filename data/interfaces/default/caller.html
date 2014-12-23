@@ -7,6 +7,24 @@
 
 <%def name="body()">
 
+
+<div class="modal fade" id="confirm-submit" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+              <div id="script_confirm" class="btn btn-lg btn-primary"></div>
+          </div>
+          <div class="modal-body">
+              <strong>Are you sure you want to perform this function?</strong>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+            <a href="caller?call=reindex&action=POST"><button type="button" class="btn btn-danger">Start Reindex - Invalid Content Type</button></a>
+          </div>
+        </div>
+    </div>
+</div>
+
 <div class="row">
   <div class="col-sm-12">
     <div class="panel panel-primary">
@@ -14,7 +32,9 @@
         <h3 class="panel-title">Reindex</h3>
       </div>
       <div class="panel-body">
-        <a href="caller?call=reindex&action=POST"><button type="button" class="btn btn-danger">Start Reindex - Currently Errors in Status Code 415 (Invalid Content Type)</button></a>
+        <input type="hidden" id="script_name" value="Reindex">
+        <input type="button" id="submitBtn" value="Begin Reindex" data-toggle="modal" data-target="#confirm-submit" class="btn btn-success" />
+        <a href="caller?call=reindex&action=GET"><button type="button" class="btn btn-primary">Get Reindex Status</button></a>
       </div>
     </div>
   </div>
@@ -24,12 +44,18 @@
 
 <%def name="javascriptIncludes()">
 <script type="text/javascript">
-%if status and status_msg:
-  %if status=="success":
-    $(".ajaxMsg").html('<div class="alert alert-success">${status_msg}</div>').show().fadeOut(5000);
-  %elif status=="failure":
-    $(".ajaxMsg").html('<div class="alert alert-danger">${status_msg}</div>').show().fadeOut(5000);
+
+  $('#submitBtn').click(function() {
+       /* when the button in the form, display the entered values in the modal */
+       $('#script_confirm').html($('#script_name').val());
+  });
+
+  %if status and status_msg:
+    %if status=="success":
+      $(".ajaxMsg").html('<div class="alert alert-success">${status_msg}</div>').show().fadeOut(5000);
+    %elif status=="failure":
+      $(".ajaxMsg").html('<div class="alert alert-danger">${status_msg}</div>').show().fadeOut(5000);
+    %endif
   %endif
-%endif
 </script>
 </%def>

@@ -42,10 +42,7 @@ class WebInterface(object):
 
 	def index(self, oauth_token=None):
 		if oauth_token:
-			try:
-				status, status_msg = backend.ajaxMSG('success', backend.validate_oauth(oauth_token))
-			except:
-				status, status_msg = backend.ajaxMSG('failure', 'Could not validate OAuth flow. Check configuration')
+			status, status_msg = backend.validate_oauth(oauth_token)
 		else:
 			status, status_msg = '', ''
 
@@ -53,12 +50,11 @@ class WebInterface(object):
 	index.exposed=True
 
 	def oauth_request(self):
-		try:
-			authorize_token_url = backend.redirect_oauth()
-			raise cherrypy.HTTPRedirect(authorize_token_url)
-		except:
-			status, status_msg = backend.ajaxMSG('failure', 'Invalid Consumer Key, RSA Keys, or JIRA App Link - please check configuration')
+		authorize_token_url, status, status_msg = backend.redirect_oauth()
+		if authorize_token_url == "home":
 			return serve_template(templatename="index.html", title="Home", status=status, status_msg=status_msg)
+		else:
+			raise cherrypy.HTTPRedirect(authorize_token_url)
 	oauth_request.exposed = True
 
 	def oauth_logout(self):
