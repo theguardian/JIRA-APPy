@@ -8,10 +8,10 @@ When logging in via OAuth, token/secret credentials are stored for the user curr
 desktop environment. For that reason, a username/password combination is recommended for access to this WebApp.
 
 ## Why?
-* JIRA has a fairly [comprehensive API](https://docs.atlassian.com/jira/REST/latest/) that can perform a great many functions. 
+JIRA has a fairly [comprehensive API](https://docs.atlassian.com/jira/REST/latest/) that can perform a great many functions. 
 Instead of installing dozens(!) of small add-ons that perform very specific functions or writing your own add-ons, 
 it often makes sense to make use of the API instead. It keeps your JIRA install clean, and the API can be utilized 
-1:1 for OnDemand or Server instances.
+1:1 for OnDemand or Server instances. For example...
 * You want to click a single button to generate multiple issues according to a template you define
 * You want to bulk-process issues according to your own algorithms.  Blue Sky.
 * You want to automate API tasks on a schedule. Cron +.
@@ -42,7 +42,6 @@ If you simply want to add Frontend Features, the easiest way to do so is in the 
 * /data/interfaces/default/*.html => HTML to display I/O for algorithms
 
 # Installation & Configuration
-==============================
 ## Required Dependencies
 1. Python 2.7
 2. OpenSSL to generate RSA private and public keys
@@ -95,5 +94,4 @@ handshake was a success!
 2. If you receive any errors, check the JIRA-APPy log file
 
 # License
-=========
 GNU General Public License, v2.  Free to use, distribute and modify for all purposes.  See LICENSE file for more information. 
