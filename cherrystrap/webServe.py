@@ -1,81 +1,79 @@
-import os, cherrypy, urllib, base64
-from cherrypy import request
-
+import os, cherrypy, urllib, collections
+from cherrypy import _cperror, request
 from lib import simplejson as json
-from lib.tlslite.utils import keyfactory
-from lib.httplib2 import urlparse
-from lib import oauth2 as oauth
-# from lib import flask
-# from flask import request
-# from flask import jsonify
-
-from mako.template import Template
-from mako.lookup import TemplateLookup
-from mako import exceptions
+from auth import AuthController, require, member_of, name_is
+from templating import serve_template
 
 import threading, time
-import csv
 
 import cherrystrap
 
 from cherrystrap import logger, formatter, database, backend
-from cherrystrap.formatter import checked
 
-# @app.route("/get_my_ip", methods=["GET"])
-# def get_my_ip():
-# 	return jsonify({'ip': request.environ['REMOTE_ADDR']}), 200
-
-def serve_template(templatename, **kwargs):
-
-	interface_dir = os.path.join(str(cherrystrap.PROG_DIR), 'data/interfaces/')
-	template_dir = os.path.join(str(interface_dir), cherrystrap.HTTP_LOOK)
-
-	_hplookup = TemplateLookup(directories=[template_dir])
-
-	try:
-		template = _hplookup.get_template(templatename)
-		return template.render(**kwargs)
-	except:
-		return exceptions.html_error_template().render()
+SESSION_KEY = '_cp_username'
 
 class WebInterface(object):
 
-	def index(self, oauth_token=None):
+    def error_page_404(status, message, traceback, version):
+        msg = "%s - %s" % (status, message)
+        return serve_template(templatename="index.html", title="404 - Page Not Found", msg=msg)
+    cherrypy.config.update({'error_page.404': error_page_404})
+
+    def handle_error():
+        cherrypy.response.status = 500
+        logger.error("500 Error: %s" % _cperror.format_exc())
+        cherrypy.response.body = ["<html><body>Sorry, an error occured</body></html>"]
+
+    _cp_config = {
+        'tools.sessions.on': True,
+        'tools.auth.on': True,
+        'error_page.404': error_page_404,
+        'request.error_response': handle_error
+    }
+
+    auth = AuthController()
+
+    @require()
+    def index(self, oauth_token=None):
 		if oauth_token:
-			status, status_msg = backend.validate_oauth(oauth_token)
+			status, msg = backend.validate_oauth(oauth_token)
 		else:
-			status, status_msg = '', ''
+			status, msg = '', ''
 
-		return serve_template(templatename="index.html", title="Home", status=status, status_msg=status_msg)
-	index.exposed=True
+		return serve_template(templatename="index.html", title="Home", status=status, msg=msg)
+    index.exposed = True
 
-	def oauth_request(self):
-		authorize_token_url, status, status_msg = backend.redirect_oauth()
-		if authorize_token_url == "home":
-			return serve_template(templatename="index.html", title="Home", status=status, status_msg=status_msg)
+    @require()
+    def oauth_request(self):
+		authorize_token_url, status, msg = backend.redirect_oauth()
+		if not authorize_token_url:
+			return serve_template(templatename="index.html", title="Home", status=status, msg=msg)
 		else:
 			raise cherrypy.HTTPRedirect(authorize_token_url)
-	oauth_request.exposed = True
+    oauth_request.exposed = True
 
-	def oauth_logout(self):
+    @require()
+    def oauth_logout(self):
 		cherrystrap.JIRA_OAUTH_TOKEN = None
 		cherrystrap.JIRA_OAUTH_SECRET = None
 		cherrystrap.config_write()
 		cherrystrap.JIRA_LOGIN_STATUS = None
 		cherrystrap.JIRA_LOGIN_USER = None
-		status, status_msg = backend.ajaxMSG('success', 'Successfully logged out of JIRA OAuth')
-		return serve_template(templatename="index.html", title="Home", status=status, status_msg=status_msg)
-	oauth_logout.exposed = True
+		status, msg = backend.ajaxMSG('success', 'Successfully logged out of JIRA OAuth')
+		return serve_template(templatename="index.html", title="Home", status=status, msg=msg)
+    oauth_logout.exposed = True
 
-	def listener(self):
+    @require()
+    def listener(self):
 		return serve_template(templatename="listener.html", title="Webhooks")
-	listener.exposed = True
+    listener.exposed = True
 
-	def caller(self, call=None, action=None):
+    @require()
+    def caller(self, call=None, action=None):
 		if cherrystrap.JIRA_LOGIN_STATUS:
 			consumer, client = backend.stored_oauth()
-			status, status_msg = '', ''
-			
+			status, msg = '', ''
+
 			# Reindex JIRA
 			if call=='reindex':
 				if action=='POST':
@@ -83,33 +81,34 @@ class WebInterface(object):
 					try:
 						resp, content = client.request(data_url, "POST")
 						if resp['status'] != '202':
-							status, status_msg = backend.ajaxMSG('failure', 'Call for JIRA Reindex failed with status code '+resp['status'])
+							status, msg = backend.ajaxMSG('failure', 'Call for JIRA Reindex failed with status code '+resp['status'])
 						else:
-							status, status_msg = backend.ajaxMSG('success', 'JIRA is now reindexing')
+							status, msg = backend.ajaxMSG('success', 'JIRA is now reindexing')
 					except:
-						status, status_msg = backend.ajaxMSG('failure', 'Could not connect to '+data_url)
-				
+						status, msg = backend.ajaxMSG('failure', 'Could not connect to '+data_url)
+
 				elif action=='GET':
 					data_url = os.path.join(cherrystrap.JIRA_BASE_URL, 'rest/api/2/reindex')
 					try:
 						resp, content = client.request(data_url, "GET")
 						if resp['status'] != '200':
-							status, status_msg = backend.ajaxMSG('failure', 'Call for JIRA Reindex status failed with status code '+resp['status'])
+							status, msg = backend.ajaxMSG('failure', 'Call for JIRA Reindex status failed with status code '+resp['status'])
 						else:
 							resp_dict = json.loads(content)
 							currentProgress = resp_dict['currentProgress']
-							status, status_msg = backend.ajaxMSG('success', 'JIRA reindex is '+str(currentProgress)+'% complete')
+							status, msg = backend.ajaxMSG('success', 'JIRA reindex is '+str(currentProgress)+'% complete')
 					except:
-						status, status_msg = backend.ajaxMSG('failure', 'Could not connect to '+data_url)
+						status, msg = backend.ajaxMSG('failure', 'Could not connect to '+data_url)
 			# End Reindex
 
 		else:
-			status, status_msg = backend.ajaxMSG('failure', 'Can not call JIRA without being logged in')
+			status, msg = backend.ajaxMSG('failure', 'Can not call JIRA without being logged in')
 
-		return serve_template(templatename="caller.html", title="Call JIRA", status=status, status_msg=status_msg)
-	caller.exposed = True
+		return serve_template(templatename="caller.html", title="Call JIRA", status=status, msg=msg)
+    caller.exposed = True
 
-	def operations(self, script=None, issue_list_input=None):
+    @require()
+    def operations(self, script=None, issue_list_input=None):
 		if cherrystrap.JIRA_LOGIN_STATUS:
 			consumer, client = backend.stored_oauth()
 
@@ -148,116 +147,105 @@ class WebInterface(object):
 									logger.info("No worklogs found for issue %s" % issue)
 						except:
 							logger.warn("Could not connect to %s" % data_url)
-					status, status_msg = backend.ajaxMSG('success', '%d worklog(s) have been deleted for %d issues' % (num_worklogs, num_issues))
+					status, msg = backend.ajaxMSG('success', '%d worklog(s) have been deleted for %d issues' % (num_worklogs, num_issues))
 				else:
-					status, status_msg = backend.ajaxMSG('failure', 'No issues entered for processing')
+					status, msg = backend.ajaxMSG('failure', 'No issues entered for processing')
 			else:
-				status, status_msg = '', ''
+				status, msg = '', ''
 		else:
-			status, status_msg = backend.ajaxMSG('failure', 'Can not operate on JIRA without being logged in')
+			status, msg = backend.ajaxMSG('failure', 'Can not operate on JIRA without being logged in')
 
-		return serve_template(templatename="operations.html", title="Bulk Operations", status=status, status_msg=status_msg)
-	operations.exposed = True
+		return serve_template(templatename="operations.html", title="Bulk Operations", status=status, msg=msg)
+    operations.exposed = True
 
-	def config(self):
-		http_look_dir = os.path.join(cherrystrap.PROG_DIR, 'data/interfaces/')
-		http_look_list = [ name for name in os.listdir(http_look_dir) if os.path.isdir(os.path.join(http_look_dir, name)) ]
+    @require()
+    def config(self):
+        http_look_dir = os.path.join(cherrystrap.PROG_DIR, 'static/interfaces/')
+        http_look_list = [ name for name in os.listdir(http_look_dir) if os.path.isdir(os.path.join(http_look_dir, name)) ]
 
-		config = {
-					"server_name":      cherrystrap.SERVER_NAME,
-					"http_host":        cherrystrap.HTTP_HOST,
-					"https_enabled":	checked(cherrystrap.HTTPS_ENABLED),
-					"https_key":		cherrystrap.HTTPS_KEY,
-					"https_cert":		cherrystrap.HTTPS_CERT,
-					"http_user":        cherrystrap.HTTP_USER,
-					"http_port":        cherrystrap.HTTP_PORT,
-					"http_pass":        cherrystrap.HTTP_PASS,
-					"http_look":        cherrystrap.HTTP_LOOK,
-					"http_look_list":   http_look_list,
-					"launch_browser":   checked(cherrystrap.LAUNCH_BROWSER),
-					"logdir":           cherrystrap.LOGDIR,
-					"rsa_private_key":	cherrystrap.RSA_PRIVATE_KEY,
-					"rsa_public_key":	cherrystrap.RSA_PUBLIC_KEY,
-					"consumer_key":		cherrystrap.CONSUMER_KEY,
-					"consumer_secret":	cherrystrap.CONSUMER_SECRET,
-					"jira_base_url":	cherrystrap.JIRA_BASE_URL,
-				}
-		return serve_template(templatename="config.html", title="Settings", config=config)    
-	config.exposed = True
+        config = {
+            "http_look_list":   http_look_list
+        }
 
-	def configUpdate(self, server_name="Server", http_host='0.0.0.0', http_user=None, http_port=7889, http_pass=None, http_look=None, launch_browser=0, logdir=None, 
-		consumer_key=None, consumer_secret=None, jira_base_url=None, https_enabled=0, https_key=None, https_cert=None, rsa_private_key=None, rsa_public_key=None):
+        return serve_template(templatename="config.html", title="Settings", config=config)
+    config.exposed = True
 
-		cherrystrap.SERVER_NAME = server_name
-		cherrystrap.HTTP_HOST = http_host
-		cherrystrap.HTTP_PORT = http_port
-		cherrystrap.HTTPS_ENABLED = https_enabled
-		cherrystrap.HTTPS_KEY = https_key
-		cherrystrap.HTTPS_CERT = https_cert
-		cherrystrap.HTTP_USER = http_user
-		cherrystrap.HTTP_PASS = http_pass
-		cherrystrap.HTTP_LOOK = http_look
-		cherrystrap.LAUNCH_BROWSER = launch_browser
-		cherrystrap.LOGDIR = logdir
+    @require()
+    def logs(self):
+        return serve_template(templatename="logs.html", title="Log", lineList=cherrystrap.LOGLIST)
+    logs.exposed = True
 
-		cherrystrap.RSA_PRIVATE_KEY = rsa_private_key
-		cherrystrap.RSA_PUBLIC_KEY = rsa_public_key
-		cherrystrap.CONSUMER_KEY = consumer_key
-		cherrystrap.CONSUMER_SECRET = consumer_secret
-		cherrystrap.JIRA_BASE_URL = jira_base_url
+    @require()
+    def shutdown(self):
+        cherrystrap.config_write()
+        cherrystrap.SIGNAL = 'shutdown'
+        message = 'shutting down ...'
+        return serve_template(templatename="shutdown.html", title="Exit", message=message, timer=10)
+        return page
+    shutdown.exposed = True
 
-		cherrystrap.config_write()
-		logger.info("Configuration saved successfully")
+    @require()
+    def restart(self):
+        cherrystrap.SIGNAL = 'restart'
+        message = 'restarting ...'
+        return serve_template(templatename="shutdown.html", title="Restart", message=message, timer=15)
+    restart.exposed = True
 
-	configUpdate.exposed = True
+    @require()
+    def shutdown(self):
+        cherrystrap.config_write()
+        cherrystrap.SIGNAL = 'shutdown'
+        message = 'shutting down ...'
+        return serve_template(templatename="shutdown.html", title="Exit", message=message, timer=15)
+        return page
+    shutdown.exposed = True
 
-	def logs(self):
-		 return serve_template(templatename="logs.html", title="Log", lineList=cherrystrap.LOGLIST)
-	logs.exposed = True
+    @require()
+    def update(self):
+        cherrystrap.SIGNAL = 'update'
+        message = 'updating ...'
+        return serve_template(templatename="shutdown.html", title="Update", message=message, timer=30)
+    update.exposed = True
 
-	def getLog(self,iDisplayStart=0,iDisplayLength=100,iSortCol_0=0,sSortDir_0="desc",sSearch="",**kwargs):
+    # Safe to delete this def, it's just there as a reference
+    def template(self):
+        return serve_template(templatename="template.html", title="Template Reference")
+    template.exposed=True
 
-		iDisplayStart = int(iDisplayStart)
-		iDisplayLength = int(iDisplayLength)
+    def checkGithub(self):
+        # Make sure this is requested via ajax
+        request_type = cherrypy.request.headers.get('X-Requested-With')
+        if str(request_type).lower() == 'xmlhttprequest':
+            pass
+        else:
+            msg = "This page exists, but is not accessible via web browser"
+            return serve_template(templatename="index.html", title="404 - Page Not Found", msg=msg)
 
-		filtered = []
-		if sSearch == "":
-			filtered = cherrystrap.LOGLIST[::]
-		else:
-			filtered = [row for row in cherrystrap.LOGLIST for column in row if sSearch in column]
+        from cherrystrap import versioncheck
+        versioncheck.checkGithub()
+        cherrystrap.IGNORE_UPDATES = False
+    checkGithub.exposed = True
 
-		sortcolumn = 0
-		if iSortCol_0 == '1':
-			sortcolumn = 2
-		elif iSortCol_0 == '2':
-			sortcolumn = 1
-		filtered.sort(key=lambda x:x[sortcolumn],reverse=sSortDir_0 == "desc")
+    def ignoreUpdates(self):
+        # Make sure this is requested via ajax
+        request_type = cherrypy.request.headers.get('X-Requested-With')
+        if str(request_type).lower() == 'xmlhttprequest':
+            pass
+        else:
+            msg = "This page exists, but is not accessible via web browser"
+            return serve_template(templatename="index.html", title="404 - Page Not Found", msg=msg)
 
-		rows = filtered[iDisplayStart:(iDisplayStart+iDisplayLength)]
-		rows = [[row[0],row[2],row[1]] for row in rows]
+        cherrystrap.IGNORE_UPDATES = True
+    ignoreUpdates.exposed = True
 
-		dict = {'iTotalDisplayRecords':len(filtered),
-				'iTotalRecords':len(cherrystrap.LOGLIST),
-				'aaData':rows,
-				}
-		s = json.dumps(dict)
-		return s
-	getLog.exposed = True
+    def ajaxUpdate(self):
+        # Make sure this is requested via ajax
+        request_type = cherrypy.request.headers.get('X-Requested-With')
+        if str(request_type).lower() == 'xmlhttprequest':
+            pass
+        else:
+            msg = "This page exists, but is not accessible via web browser"
+            return serve_template(templatename="index.html", title="404 - Page Not Found", msg=msg)
 
-	def template(self):
-		return serve_template(templatename="template.html", title="Template")
-	template.exposed=True
-
-	def shutdown(self):
-		cherrystrap.config_write()
-		cherrystrap.SIGNAL = 'shutdown'
-		message = 'shutting down ...'
-		return serve_template(templatename="shutdown.html", title="Exit", message=message, timer=10)
-		return page
-	shutdown.exposed = True
-
-	def restart(self):
-		cherrystrap.SIGNAL = 'restart'
-		message = 'restarting ...'
-		return serve_template(templatename="shutdown.html", title="Restart", message=message, timer=10)
-	restart.exposed = True
+        return serve_template(templatename="ajaxUpdate.html")
+    ajaxUpdate.exposed = True

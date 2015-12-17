@@ -61,9 +61,9 @@ class IMAP4_TLS(IMAP4, ClientHelper):
         @type privateKey: L{tlslite.utils.rsakey.RSAKey}
         @param privateKey: Private key for client authentication.
         Requires the 'certChain' argument.  Excludes the SRP arguments.
-        
+
         @type checker: L{tlslite.checker.Checker}
-        @param checker: Callable object called after handshaking to 
+        @param checker: Callable object called after handshaking to
         evaluate the connection and raise an Exception if necessary.
 
         @type settings: L{tlslite.handshakesettings.HandshakeSettings}

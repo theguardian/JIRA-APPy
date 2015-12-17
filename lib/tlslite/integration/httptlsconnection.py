@@ -1,4 +1,4 @@
-# Authors: 
+# Authors:
 #   Trevor Perrin
 #   Kees Bos - Added ignoreAbruptClose parameter
 #   Dimitris Moraitis - Anon ciphersuites
@@ -21,14 +21,14 @@ from lib.tlslite.integration.clienthelper import ClientHelper
 class HTTPTLSConnection(httplib.HTTPConnection, ClientHelper):
     """This class extends L{httplib.HTTPConnection} to support TLS."""
 
-    def __init__(self, host, port=None, strict=None, 
+    def __init__(self, host, port=None, strict=None,
                 timeout=socket._GLOBAL_DEFAULT_TIMEOUT,
                 source_address=None,
                 username=None, password=None,
                 certChain=None, privateKey=None,
                 checker=None,
                 settings=None,
-                ignoreAbruptClose=False, 
+                ignoreAbruptClose=False,
                 anon=False):
         """Create a new HTTPTLSConnection.
 
@@ -73,14 +73,14 @@ class HTTPTLSConnection(httplib.HTTPConnection, ClientHelper):
         @type certChain: L{tlslite.x509certchain.X509CertChain} or
         @param certChain: Certificate chain for client authentication.
         Requires the 'privateKey' argument.  Excludes the SRP arguments.
-        
+
         @type privateKey: L{tlslite.utils.rsakey.RSAKey}
         @param privateKey: Private key for client authentication.
-        Requires the 'certChain' argument.  Excludes the SRP arguments. 
-        
+        Requires the 'certChain' argument.  Excludes the SRP arguments.
+
         @type checker: L{tlslite.checker.Checker}
-        @param checker: Callable object called after handshaking to 
-        evaluate the connection and raise an Exception if necessary.          
+        @param checker: Callable object called after handshaking to
+        evaluate the connection and raise an Exception if necessary.
 
         @type settings: L{tlslite.handshakesettings.HandshakeSettings}
         @param settings: Various settings which can be used to control
@@ -88,21 +88,26 @@ class HTTPTLSConnection(httplib.HTTPConnection, ClientHelper):
         offered by the client.
 
         @type ignoreAbruptClose: bool
-        @param ignoreAbruptClose: ignore the TLSAbruptCloseError on 
+        @param ignoreAbruptClose: ignore the TLSAbruptCloseError on
         unexpected hangup.
         """
         if source_address:
-            httplib.HTTPConnection.__init__(self, host, port, strict,
-                                            timeout, source_address)
+            httplib.HTTPConnection.__init__(self,
+                    host=host,
+                    port=port,
+                    timeout=timeout,
+                    source_address=source_address)
         if not source_address:
-            httplib.HTTPConnection.__init__(self, host, port, strict,
-                                            timeout)
+            httplib.HTTPConnection.__init__(self,
+                    host=host,
+                    port=port,
+                    timeout=timeout)
         self.ignoreAbruptClose = ignoreAbruptClose
         ClientHelper.__init__(self,
-                 username, password, 
+                 username, password,
                  certChain, privateKey,
                  checker,
-                 settings, 
+                 settings,
                  anon)
 
     def connect(self):

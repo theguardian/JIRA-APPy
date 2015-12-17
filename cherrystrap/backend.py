@@ -21,7 +21,7 @@ def redirect_oauth():
     try:
         resp, content = client.request(request_token_url, "POST")
         if resp['status'] != '200':
-            authorize_token_url = "home"
+            authorize_token_url = None
             status, status_msg = ajaxMSG('failure', 'Invalid Consumer Key, RSA Keys, or JIRA App Link - please check configuration')
         else:
             request_token = dict(urlparse.parse_qsl(content))
@@ -56,7 +56,7 @@ def verified_oauth(oauth_token, oauth_token_secret):
 
 def validate_oauth(oauth_token):
     consumer, client = request_oauth(oauth_token)
-    
+
     access_token_url = os.path.join(cherrystrap.JIRA_BASE_URL, 'plugins/servlet/oauth/access-token')
     data_url = os.path.join(cherrystrap.JIRA_BASE_URL, 'rest/api/2/myself')
 
@@ -111,41 +111,6 @@ def check_oauth():
         cherrystrap.JIRA_LOGIN_USER = resp_dict['name']
         logger.info("JIRA user %s verified login" % resp_dict['name'])
 
-def create_https_certificates(ssl_cert, ssl_key):
-    """
-    Create a pair of self-signed HTTPS certificares and store in them in
-    'ssl_cert' and 'ssl_key'. Method assumes pyOpenSSL is installed.
-    """
-    import os
-    from cherrystrap import logger
-
-    from OpenSSL import crypto
-    from lib.certgen import createKeyPair, createCertRequest, createCertificate, \
-        TYPE_RSA, serial
-
-    # Create the CA Certificate
-    cakey = createKeyPair(TYPE_RSA, 2048)
-    careq = createCertRequest(cakey, CN="Certificate Authority")
-    cacert = createCertificate(careq, (careq, cakey), serial, (0, 60 * 60 * 24 * 365 * 10)) # ten years
-
-    pkey = createKeyPair(TYPE_RSA, 2048)
-    req = createCertRequest(pkey, CN="CherryStrap")
-    cert = createCertificate(req, (cacert, cakey), serial, (0, 60 * 60 * 24 * 365 * 10)) # ten years
-
-    # Save the key and certificate to disk
-    try:
-        if not os.path.exists('keys'):
-            os.makedirs('keys')
-        with open('keys/server.key', "w+") as fp:
-            fp.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, pkey))
-        with open('keys/server.crt', "w+") as fp:
-            fp.write(crypto.dump_certificate(crypto.FILETYPE_PEM, cert))
-    except IOError:
-        logger.error("Error creating SSL key and certificate")
-        return False
-
-    return True
-
 class SignatureMethod_RSA_SHA1(oauth.SignatureMethod):
     name = 'RSA-SHA1'
 
@@ -178,7 +143,6 @@ class SignatureMethod_RSA_SHA1(oauth.SignatureMethod):
             return base64.b64encode(signature)
         except:
             logger.warn('Private Key File not found on server at location %s' % cherrystrap.RSA_PRIVATE_KEY)
-
 
 def ajaxMSG(status, status_msg):
     if status == 'success':

@@ -52,6 +52,7 @@ except ImportError:
 import zlib
 length = len(zlib.compress(os.urandom(1000)))
 assert(length > 900)
+del length
 
 def getRandomBytes(howMany):
     b = bytearray(os.urandom(howMany))
@@ -207,7 +208,7 @@ if gmpyLoaded:
         power = gmpy.mpz(power)
         modulus = gmpy.mpz(modulus)
         result = pow(base, power, modulus)
-        return long(result)
+        return compatLong(result)
 
 else:
     def powMod(base, power, modulus):
@@ -231,9 +232,7 @@ def makeSieve(n):
     sieve = [x for x in sieve[2:] if x]
     return sieve
 
-sieve = makeSieve(1000)
-
-def isPrime(n, iterations=5, display=False):
+def isPrime(n, iterations=5, display=False, sieve=makeSieve(1000)):
     #Trial division with sieve
     for x in sieve:
         if x >= n: return True

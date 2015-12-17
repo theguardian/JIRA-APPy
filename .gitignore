@@ -1,8 +1,8 @@
 #  User Related   #
 ######################
 cache/*
-cache.db*
-sqlite.db
+*.db
+*.lock
 config.ini
 Logs/*
 keys/*

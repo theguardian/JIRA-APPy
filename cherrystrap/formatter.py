@@ -1,8 +1,10 @@
-import time, datetime
+import time, datetime, base64
 from time import strptime
 
-import cherrystrap
-
+def schedulerTest():
+    now = datetime.datetime.now()
+    print "Scheduled Job completed at "+now.strftime("%Y-%m-%d %H:%M:%S")
+    return now.strftime("%Y-%m-%d %H:%M:%S")
 
 def now():
     now = datetime.datetime.now()
@@ -40,6 +42,23 @@ def checked(variable):
         return 'Checked'
     else:
         return ''
+
+def encode(key, clear):
+    enc = []
+    for i in range(len(clear)):
+        key_c = key[i % len(key)]
+        enc_c = chr((ord(clear[i]) + ord(key_c)) % 256)
+        enc.append(enc_c)
+    return base64.urlsafe_b64encode("".join(enc))
+
+def decode(key, enc):
+    dec = []
+    enc = base64.urlsafe_b64decode(enc.encode("utf-8"))
+    for i in range(len(enc)):
+        key_c = key[i % len(key)]
+        dec_c = chr((256 + ord(enc[i]) - ord(key_c)) % 256)
+        dec.append(dec_c)
+    return "".join(dec)
 
 def latinToAscii(unicrap):
     """
@@ -86,3 +105,38 @@ def replace_all(text, dic):
     for i, j in dic.iteritems():
         text = text.replace(i, j)
     return text
+
+def create_https_certificates(ssl_cert, ssl_key):
+    """
+    Create a pair of self-signed HTTPS certificares and store in them in
+    'ssl_cert' and 'ssl_key'. Method assumes pyOpenSSL is installed.
+    """
+    import os
+    from cherrystrap import logger
+
+    from OpenSSL import crypto
+    from lib.certgen import createKeyPair, createCertRequest, createCertificate, \
+        TYPE_RSA, serial
+
+    # Create the CA Certificate
+    cakey = createKeyPair(TYPE_RSA, 2048)
+    careq = createCertRequest(cakey, CN="Certificate Authority")
+    cacert = createCertificate(careq, (careq, cakey), serial, (0, 60 * 60 * 24 * 365 * 10)) # ten years
+
+    pkey = createKeyPair(TYPE_RSA, 2048)
+    req = createCertRequest(pkey, CN="CherryStrap")
+    cert = createCertificate(req, (cacert, cakey), serial, (0, 60 * 60 * 24 * 365 * 10)) # ten years
+
+    # Save the key and certificate to disk
+    try:
+        if not os.path.exists('keys'):
+            os.makedirs('keys')
+        with open('keys/server.key', "w+") as fp:
+            fp.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, pkey))
+        with open('keys/server.crt', "w+") as fp:
+            fp.write(crypto.dump_certificate(crypto.FILETYPE_PEM, cert))
+    except IOError:
+        logger.error("Error creating SSL key and certificate")
+        return False
+
+    return True

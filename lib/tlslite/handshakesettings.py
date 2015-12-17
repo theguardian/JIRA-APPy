@@ -95,6 +95,9 @@ class HandshakeSettings(object):
     
     Note that TACK support is not standardized by IETF and uses a temporary
     TLS Extension number, so should NOT be used in production software.
+
+    @type sendFallbackSCSV: bool
+    @ivar sendFallbackSCSV: Whether to, as a client, send FALLBACK_SCSV.
     """
     def __init__(self):
         self.minKeySize = 1023
@@ -106,10 +109,17 @@ class HandshakeSettings(object):
         self.minVersion = (3,1)
         self.maxVersion = (3,3)
         self.useExperimentalTackExtension = False
+        self.sendFallbackSCSV = False
 
-    # Validates the min/max fields, and certificateTypes
-    # Filters out unsupported cipherNames and cipherImplementations
-    def _filter(self):
+    def validate(self):
+        """
+        Validate the settings, filter out unsupported ciphersuites and return
+        a copy of object. Does not modify the original object.
+
+        @rtype: HandshakeSettings
+        @return: a self-consistent copy of settings
+        @raise ValueError: when settings are invalid, insecure or unsupported.
+        """
         other = HandshakeSettings()
         other.minKeySize = self.minKeySize
         other.maxKeySize = self.maxKeySize
@@ -119,6 +129,10 @@ class HandshakeSettings(object):
         other.certificateTypes = self.certificateTypes
         other.minVersion = self.minVersion
         other.maxVersion = self.maxVersion
+        other.sendFallbackSCSV = self.sendFallbackSCSV
+
+        if other.maxVersion < (3,3):
+            other.macNames = [e for e in self.macNames if e != "sha256"]
 
         if not cipherfactory.tripleDESPresent:
             other.cipherNames = [e for e in self.cipherNames if e != "3des"]
@@ -144,6 +158,8 @@ class HandshakeSettings(object):
             raise ValueError("maxKeySize too small")
         if other.maxKeySize>16384:
             raise ValueError("maxKeySize too large")
+        if other.maxKeySize < other.minKeySize:
+            raise ValueError("maxKeySize smaller than minKeySize")
         for s in other.cipherNames:
             if s not in CIPHER_NAMES:
                 raise ValueError("Unknown cipher name: '%s'" % s)
@@ -163,17 +179,14 @@ class HandshakeSettings(object):
         if not other.maxVersion in ((3,0), (3,1), (3,2), (3,3)):
             raise ValueError("maxVersion set incorrectly")
 
-        if other.maxVersion < (3,3):
-            # No sha256 pre TLS 1.2
-            other.macNames = [e for e in self.macNames if e != "sha256"]
-
         return other
 
-    def _getCertificateTypes(self):
-        l = []
+    def getCertificateTypes(self):
+        """Get list of certificate types as IDs"""
+        ret = []
         for ct in self.certificateTypes:
             if ct == "x509":
-                l.append(CertificateType.x509)
+                ret.append(CertificateType.x509)
             else:
                 raise AssertionError()
-        return l
+        return ret

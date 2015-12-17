@@ -1,6 +1,7 @@
 # Authors: 
 #   Trevor Perrin
 #   Google (adapted by Sam Rushing) - NPN support
+#   Google - minimal padding
 #   Martin von Loewis - python 3 port
 #   Yngve Pettersen (ported by Paul Sokolovsky) - TLS 1.2
 #
@@ -288,7 +289,9 @@ class TLSRecordLayer(object):
         except GeneratorExit:
             raise
         except Exception:
-            self._shutdown(False)
+            # Don't invalidate the session on write failure if abrupt closes are
+            # okay.
+            self._shutdown(self.ignoreAbruptClose)
             raise
 
     def close(self):
@@ -592,9 +595,9 @@ class TLSRecordLayer(object):
                     b = self.fixedIVBlock + b
 
                 #Add padding: b = b+ (macBytes + paddingBytes)
-                currentLength = len(b) + len(macBytes) + 1
+                currentLength = len(b) + len(macBytes)
                 blockLength = self._writeState.encContext.block_size
-                paddingLength = blockLength-(currentLength % blockLength)
+                paddingLength = blockLength - 1 - (currentLength % blockLength)
 
                 paddingBytes = bytearray([paddingLength] * (paddingLength+1))
                 if self.fault == Fault.badPadding:
@@ -794,7 +797,7 @@ class TLSRecordLayer(object):
                 elif subType == HandshakeType.certificate_request:
                     yield CertificateRequest(self.version).parse(p)
                 elif subType == HandshakeType.certificate_verify:
-                    yield CertificateVerify().parse(p)
+                    yield CertificateVerify(self.version).parse(p)
                 elif subType == HandshakeType.server_key_exchange:
                     yield ServerKeyExchange(constructorType).parse(p)
                 elif subType == HandshakeType.server_hello_done:
@@ -966,6 +969,12 @@ class TLSRecordLayer(object):
                 b = self._readState.encContext.decrypt(b)
                 if self.version >= (3,2): #For TLS 1.1, remove explicit IV
                     b = b[self._readState.encContext.block_size : ]
+
+                if len(b) == 0:
+                    for result in self._sendError(\
+                            AlertDescription.decryption_failed,
+                            "No data left after decryption and IV removal"):
+                        yield result
 
                 #Check padding
                 paddingGood = True

@@ -16,6 +16,8 @@ class Writer(object):
             self.bytes[newIndex] = x & 0xFF
             x >>= 8
             newIndex -= 1
+        if x != 0:
+            raise ValueError("Can't represent value in specified length")
 
     def addFixSeq(self, seq, length):
         for e in seq:
@@ -42,6 +44,8 @@ class Parser(object):
         return x
 
     def getFixBytes(self, lengthBytes):
+        if self.index + lengthBytes > len(self.bytes):
+            raise SyntaxError()
         bytes = self.bytes[self.index : self.index+lengthBytes]
         self.index += lengthBytes
         return bytes
@@ -85,3 +89,6 @@ class Parser(object):
             return True
         else:
             raise SyntaxError()
+
+    def getRemainingLength(self):
+        return len(self.bytes) - self.index

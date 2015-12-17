@@ -1,23 +1,25 @@
 from __future__ import with_statement
 
 import os
-import sqlite3
 import threading
 import time
 
 import cherrystrap
-
-from cherrystrap import logger
+from cherrystrap import logger, formatter
 
 db_lock = threading.Lock()
 
-def dbFilename(filename="sqlite.db"):
-
+def dbFilename(filename="%s.db" % cherrystrap.APP_NAME):
     return os.path.join(cherrystrap.DATADIR, filename)
 
-class DBConnection:
+class SQLite_DBConnection:
 
-    def __init__(self, filename="sqlite.db"):
+    def __init__(self, filename="%s.db" % cherrystrap.APP_NAME):
+        try:
+            global sqlite3
+            import sqlite3
+        except Exception, e:
+            logger.error("There was an error importing SQLite: %s" % e)
         self.filename = filename
         self.connection = sqlite3.connect(dbFilename(filename), 20)
         self.connection.row_factory = sqlite3.Row
@@ -78,4 +80,78 @@ class DBConnection:
         if self.connection.total_changes == changesBefore:
             query = "INSERT INTO "+tableName+" (" + ", ".join(valueDict.keys() + keyDict.keys()) + ")" + \
                         " VALUES (" + ", ".join(["?"] * len(valueDict.keys() + keyDict.keys())) + ")"
+            self.action(query, valueDict.values() + keyDict.values())
+
+class MySQL_DBConnection:
+
+    def __init__(self):
+        try:
+            global MySQLdb
+            import MySQLdb
+        except ImportError:
+            logger.warn("The MySQLdb module is missing. Install this " \
+                "module to enable MySQL. Reverting to SQLite.")
+            cherrystrap.DATABASE_TYPE = "sqlite"
+        host = cherrystrap.MYSQL_HOST
+        port = cherrystrap.MYSQL_PORT
+        if port:
+            try:
+                port = int(cherrystrap.MYSQL_PORT)
+            except:
+                port = 3306
+                logger.error("The port number supplied is not an integer")
+        else:
+            port = 3306
+        if not host:
+            host = 'localhost'
+
+        user = cherrystrap.MYSQL_USER
+        passwd = formatter.decode('obscure', cherrystrap.MYSQL_PASS)
+
+        self.connection = MySQLdb.Connection(host=host, port=port, user=user, passwd=passwd, charset='utf8', use_unicode=True)
+
+    def action(self, query, args=None):
+
+        with self.connection:
+            self.cursor = self.connection.cursor(MySQLdb.cursors.DictCursor)
+
+            if query == None:
+                return
+
+            sqlResult = None
+
+            try:
+                if args == None:
+                    self.cursor.execute(query)
+                else:
+                    self.cursor.execute(query,args)
+                self.connection.commit()
+            except MySQLdb.IntegrityError:
+                logger.info("failed to make transaction")
+
+            sqlResult = self.cursor
+            return sqlResult
+
+    def select(self, query, args=None):
+
+        sqlResults = self.action(query, args).fetchall()
+
+        if sqlResults == None:
+            return []
+
+        return sqlResults
+
+    def upsert(self, tableName, valueDict, keyDict):
+
+        genParams = lambda myDict : [x + " = %s" for x in myDict.keys()]
+
+        entry_query = "SELECT * FROM "+tableName+" WHERE " + " AND ".join(genParams(keyDict))
+        entry_count = self.action(entry_query, keyDict.values()).rowcount
+
+        if entry_count != 0:
+            query = "UPDATE "+tableName+" SET " + ", ".join(genParams(valueDict)) + " WHERE " + " AND ".join(genParams(keyDict))
+            self.action(query, valueDict.values() + keyDict.values())
+        else:
+            query = "INSERT INTO "+tableName+" (" + ", ".join(valueDict.keys() + keyDict.keys()) + ")" + \
+                        " VALUES (" + ", ".join(["%s"] * len(valueDict.keys() + keyDict.keys())) + ")"
             self.action(query, valueDict.values() + keyDict.values())

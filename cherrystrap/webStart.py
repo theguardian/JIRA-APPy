@@ -1,13 +1,12 @@
 import os, sys, cherrypy
 import cherrystrap
 from cherrystrap import logger
-
 from cherrystrap.webServe import WebInterface
-from cherrystrap.backend import create_https_certificates
+from cherrystrap import apiServe
+from cherrystrap.formatter import create_https_certificates
 
 def initialize(options={}):
 
-    # HTTPS stuff stolen from sickbeard
     https_enabled = options['https_enabled']
     https_cert = options['https_cert']
     https_key = options['https_key']
@@ -29,9 +28,9 @@ def initialize(options={}):
     options_dict = {
         'log.screen':           False,
         'server.thread_pool':   10,
-        'server.socket_port':   options['http_port'],
-        'server.socket_host':   options['http_host'],
-        'engine.autoreload_on': False,
+        'server.socket_port':   int(options['http_port']),
+        'server.socket_host':   str(options['http_host']),
+        'engine.autoreload.on': False,
         }
 
     if https_enabled:
@@ -41,15 +40,14 @@ def initialize(options={}):
     else:
         protocol = "http"
 
-    logger.info("Starting CherryStrap on %s://%s:%d/" % (protocol,
+    logger.info("Starting %s on %s://%s:%d/" % (cherrystrap.APP_NAME, protocol,
         options['http_host'], options['http_port']))
 
     cherrypy.config.update(options_dict)
 
-
-    conf = {
+    webConf = {
         '/': {
-            'tools.staticdir.root': os.path.join(cherrystrap.PROG_DIR, 'data')
+            'tools.staticdir.root': os.path.join(cherrystrap.PROG_DIR, 'static')
         },
         '/interfaces':{
             'tools.staticdir.on': True,
@@ -67,30 +65,32 @@ def initialize(options={}):
             'tools.staticdir.on': True,
             'tools.staticdir.dir': "js"
         },
+        '/fonts':{
+            'tools.staticdir.on': True,
+            'tools.staticdir.dir': "fonts"
+        },
         '/favicon.ico':{
             'tools.staticfile.on': True,
-            'tools.staticfile.filename': "images/favicon.ico"
+            'tools.staticfile.filename': os.path.join(cherrystrap.PROG_DIR, 'static/images/favicon.ico')
         }
     }
 
-    if options['http_pass'] != "":
-        conf['/'].update({
-            'tools.auth_basic.on': True,
-            'tools.auth_basic.realm': 'cherrystrap',
-            'tools.auth_basic.checkpassword':  cherrypy.lib.auth_basic.checkpassword_dict(
-                {options['http_user']:options['http_pass']})
-        })
-
-
     # Prevent time-outs
     cherrypy.engine.timeout_monitor.unsubscribe()
-    cherrypy.tree.mount(WebInterface(), options['http_root'], config = conf)
+    cherrypy.tree.mount(WebInterface(), options['http_root'], config = webConf)
+
+    # Load API endpoints
+    cherrypy.tree.mount(apiServe.settings(), cherrystrap.HTTP_ROOT+'/api/v1/settings',
+        {'/': {'request.dispatch': cherrypy.dispatch.MethodDispatcher()}})
+    cherrypy.tree.mount(apiServe.log(), cherrystrap.HTTP_ROOT+'/api/v1/log',
+        {'/': {'request.dispatch': cherrypy.dispatch.MethodDispatcher()}})
 
     cherrypy.engine.autoreload.subscribe()
 
     try:
         cherrypy.process.servers.check_port(options['http_host'], options['http_port'])
         cherrypy.server.start()
+        #cherrypy.engine.start() is good for dev mode, but breaks --daemon
     except IOError:
         print 'Failed to start on port: %i. Is something else running?' % (options['http_port'])
         sys.exit(0)

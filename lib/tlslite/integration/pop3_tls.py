@@ -46,7 +46,7 @@ class POP3_TLS(POP3, ClientHelper):
 
         @type username: str
         @param username: SRP username.
-        
+
         @type password: str
         @param password: SRP password for mutual authentication.
         Requires the 'username' argument.
@@ -60,7 +60,7 @@ class POP3_TLS(POP3, ClientHelper):
         Requires the 'certChain' argument.  Excludes the SRP argument.
 
         @type checker: L{tlslite.checker.Checker}
-        @param checker: Callable object called after handshaking to 
+        @param checker: Callable object called after handshaking to
         evaluate the connection and raise an Exception if necessary.
 
         @type settings: L{tlslite.handshakesettings.HandshakeSettings}
@@ -76,7 +76,7 @@ class POP3_TLS(POP3, ClientHelper):
                  certChain, privateKey,
                  checker,
                  settings)
-        connection = TLSConnection(sock) 
+        connection = TLSConnection(sock)
         ClientHelper._handshake(self, connection)
         self.sock = connection
         self.file = self.sock.makefile('rb')
