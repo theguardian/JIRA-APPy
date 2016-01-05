@@ -1,7 +1,9 @@
 import os
 import cherrystrap
+import jiraappy
 from lib import simplejson as json
-from cherrystrap import logger, formatter, backend
+from cherrystrap import logger, formatter
+from jiraappy import backend
 
 def reindex(action=None):
     status, msg = '', ''
@@ -9,7 +11,7 @@ def reindex(action=None):
     consumer, client = backend.stored_oauth()
 
     if action=='POST':
-        data_url = os.path.join(cherrystrap.JIRA_BASE_URL, 'rest/api/2/reindex?type=BACKGROUND&indexComments=true&indexChangeHistory=true')
+        data_url = os.path.join(jiraappy.JIRA_BASE_URL, 'rest/api/2/reindex?type=BACKGROUND&indexComments=true&indexChangeHistory=true')
         try:
             resp, content = client.request(data_url, "POST")
             if resp['status'] != '202':
@@ -20,7 +22,7 @@ def reindex(action=None):
             status, msg = backend.ajaxMSG('failure', 'Could not connect to '+data_url)
 
     elif action=='GET':
-        data_url = os.path.join(cherrystrap.JIRA_BASE_URL, 'rest/api/2/reindex')
+        data_url = os.path.join(jiraappy.JIRA_BASE_URL, 'rest/api/2/reindex')
         try:
             resp, content = client.request(data_url, "GET")
             if resp['status'] != '200':
@@ -46,7 +48,7 @@ def bulkDeleteWorklogs(issue_list=None):
     num_worklogs = 0
     for issue in issue_list:
         num_issues+=1
-        data_url = os.path.join(cherrystrap.JIRA_BASE_URL, 'rest/api/2/issue/'+issue+'/worklog')
+        data_url = os.path.join(jiraappy.JIRA_BASE_URL, 'rest/api/2/issue/'+issue+'/worklog')
         try:
             resp, content = client.request(data_url, "GET")
             if resp['status'] != '200':
@@ -57,7 +59,7 @@ def bulkDeleteWorklogs(issue_list=None):
                 if num_results != 0:
                     for result in range(0, num_results):
                         worklog_id = resp_dict['worklogs'][result]['id']
-                        data_url = os.path.join(cherrystrap.JIRA_BASE_URL, 'rest/api/2/issue/'+issue+'/worklog/'+worklog_id+'?adjustEstimate=leave')
+                        data_url = os.path.join(jiraappy.JIRA_BASE_URL, 'rest/api/2/issue/'+issue+'/worklog/'+worklog_id+'?adjustEstimate=leave')
                         try:
                             resp, content = client.request(data_url, "DELETE")
                             if resp['status'] != '204':

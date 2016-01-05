@@ -6,17 +6,18 @@ from lib import oauth2 as oauth
 from lib import simplejson as json
 
 import cherrystrap
+import jiraappy
 
 from cherrystrap import logger
 
 def redirect_oauth():
 
-    consumer = oauth.Consumer(cherrystrap.CONSUMER_KEY, cherrystrap.CONSUMER_SECRET)
+    consumer = oauth.Consumer(jiraappy.CONSUMER_KEY, jiraappy.CONSUMER_SECRET)
     client = oauth.Client(consumer)
     client.set_signature_method(SignatureMethod_RSA_SHA1())
 
-    request_token_url = os.path.join(cherrystrap.JIRA_BASE_URL, 'plugins/servlet/oauth/request-token')
-    authorize_url = os.path.join(cherrystrap.JIRA_BASE_URL, 'plugins/servlet/oauth/authorize')
+    request_token_url = os.path.join(jiraappy.JIRA_BASE_URL, 'plugins/servlet/oauth/request-token')
+    authorize_url = os.path.join(jiraappy.JIRA_BASE_URL, 'plugins/servlet/oauth/authorize')
 
     try:
         resp, content = client.request(request_token_url, "POST")
@@ -39,7 +40,7 @@ def redirect_oauth():
     return authorize_token_url, status, status_msg
 
 def request_oauth(oauth_token):
-    consumer = oauth.Consumer(cherrystrap.CONSUMER_KEY, cherrystrap.CONSUMER_SECRET)
+    consumer = oauth.Consumer(jiraappy.CONSUMER_KEY, jiraappy.CONSUMER_SECRET)
     token = oauth.Token(oauth_token, oauth_token)
     client = oauth.Client(consumer, token)
     client.set_signature_method(SignatureMethod_RSA_SHA1())
@@ -47,7 +48,7 @@ def request_oauth(oauth_token):
     return consumer, client
 
 def verified_oauth(oauth_token, oauth_token_secret):
-    consumer = oauth.Consumer(cherrystrap.CONSUMER_KEY, cherrystrap.CONSUMER_SECRET)
+    consumer = oauth.Consumer(jiraappy.CONSUMER_KEY, jiraappy.CONSUMER_SECRET)
     accessToken = oauth.Token(oauth_token, oauth_token_secret)
     client = oauth.Client(consumer, accessToken)
     client.set_signature_method(SignatureMethod_RSA_SHA1())
@@ -57,8 +58,8 @@ def verified_oauth(oauth_token, oauth_token_secret):
 def validate_oauth(oauth_token):
     consumer, client = request_oauth(oauth_token)
 
-    access_token_url = os.path.join(cherrystrap.JIRA_BASE_URL, 'plugins/servlet/oauth/access-token')
-    data_url = os.path.join(cherrystrap.JIRA_BASE_URL, 'rest/api/2/myself')
+    access_token_url = os.path.join(jiraappy.JIRA_BASE_URL, 'plugins/servlet/oauth/access-token')
+    data_url = os.path.join(jiraappy.JIRA_BASE_URL, 'rest/api/2/myself')
 
     resp, content = client.request(access_token_url, "POST")
     access_token = dict(urlparse.parse_qsl(content))
@@ -67,48 +68,48 @@ def validate_oauth(oauth_token):
 
     resp, content = client.request(data_url, "GET")
     if resp['status'] != '200':
-        cherrystrap.JIRA_OAUTH_TOKEN = None
-        cherrystrap.JIRA_OAUTH_SECRET = None
+        jiraappy.JIRA_OAUTH_TOKEN = None
+        jiraappy.JIRA_OAUTH_SECRET = None
         cherrystrap.config_write()
-        cherrystrap.JIRA_LOGIN_STATUS = None
-        cherrystrap.JIRA_LOGIN_USER = None
+        jiraappy.JIRA_LOGIN_STATUS = None
+        jiraappy.JIRA_LOGIN_USER = None
         status, status_msg = ajaxMSG('failure', 'Could not handshake with JIRA Server. Tokens reset')
     else:
         resp_dict = json.loads(content)
-        cherrystrap.JIRA_OAUTH_TOKEN = access_token['oauth_token']
-        cherrystrap.JIRA_OAUTH_SECRET = access_token['oauth_token_secret']
+        jiraappy.JIRA_OAUTH_TOKEN = access_token['oauth_token']
+        jiraappy.JIRA_OAUTH_SECRET = access_token['oauth_token_secret']
         cherrystrap.config_write()
-        cherrystrap.JIRA_LOGIN_STATUS = True
-        cherrystrap.JIRA_LOGIN_USER = resp_dict['name']
+        jiraappy.JIRA_LOGIN_STATUS = True
+        jiraappy.JIRA_LOGIN_USER = resp_dict['name']
         status, status_msg = ajaxMSG('success', 'JIRA OAuth Tokens successfully saved to configuration file')
 
     return status, status_msg
 
 def stored_oauth():
-    consumer = oauth.Consumer(cherrystrap.CONSUMER_KEY, cherrystrap.CONSUMER_SECRET)
-    accessToken = oauth.Token(cherrystrap.JIRA_OAUTH_TOKEN, cherrystrap.JIRA_OAUTH_SECRET)
+    consumer = oauth.Consumer(jiraappy.CONSUMER_KEY, jiraappy.CONSUMER_SECRET)
+    accessToken = oauth.Token(jiraappy.JIRA_OAUTH_TOKEN, jiraappy.JIRA_OAUTH_SECRET)
     client = oauth.Client(consumer, accessToken)
     client.set_signature_method(SignatureMethod_RSA_SHA1())
 
     return consumer, client
 
 def check_oauth():
-    consumer = oauth.Consumer(cherrystrap.CONSUMER_KEY, cherrystrap.CONSUMER_SECRET)
-    accessToken = oauth.Token(cherrystrap.JIRA_OAUTH_TOKEN, cherrystrap.JIRA_OAUTH_SECRET)
+    consumer = oauth.Consumer(jiraappy.CONSUMER_KEY, jiraappy.CONSUMER_SECRET)
+    accessToken = oauth.Token(jiraappy.JIRA_OAUTH_TOKEN, jiraappy.JIRA_OAUTH_SECRET)
     client = oauth.Client(consumer, accessToken)
     client.set_signature_method(SignatureMethod_RSA_SHA1())
 
-    data_url = os.path.join(cherrystrap.JIRA_BASE_URL, 'rest/api/2/myself')
+    data_url = os.path.join(jiraappy.JIRA_BASE_URL, 'rest/api/2/myself')
 
     resp, content = client.request(data_url, "GET")
     if resp['status'] != '200':
-        cherrystrap.JIRA_LOGIN_STATUS = None
-        cherrystrap.JIRA_LOGIN_USER = None
+        jiraappy.JIRA_LOGIN_STATUS = None
+        jiraappy.JIRA_LOGIN_USER = None
         logger.warn("OAuth credentials missing or invalid")
     else:
         resp_dict = json.loads(content)
-        cherrystrap.JIRA_LOGIN_STATUS = True
-        cherrystrap.JIRA_LOGIN_USER = resp_dict['name']
+        jiraappy.JIRA_LOGIN_STATUS = True
+        jiraappy.JIRA_LOGIN_USER = resp_dict['name']
         logger.info("JIRA user %s verified login" % resp_dict['name'])
 
 class SignatureMethod_RSA_SHA1(oauth.SignatureMethod):
@@ -135,14 +136,14 @@ class SignatureMethod_RSA_SHA1(oauth.SignatureMethod):
         key, raw = self.signing_base(request, consumer, token)
 
         try:
-            with open(cherrystrap.RSA_PRIVATE_KEY, 'r') as f:
+            with open(jiraappy.RSA_PRIVATE_KEY, 'r') as f:
                 data = f.read()
             privateKeyString = data.strip()
             privatekey = keyfactory.parsePrivateKey(privateKeyString)
             signature = str(privatekey.hashAndSign(raw))
             return base64.b64encode(signature)
         except:
-            logger.warn('Private Key File not found on server at location %s' % cherrystrap.RSA_PRIVATE_KEY)
+            logger.warn('Private Key File not found on server at location %s' % jiraappy.RSA_PRIVATE_KEY)
 
 def ajaxMSG(status, status_msg):
     if status == 'success':

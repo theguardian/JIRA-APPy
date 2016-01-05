@@ -48,15 +48,18 @@ class settings(object):
                 "gitStartup": bool(cherrystrap.GIT_STARTUP),
                 "gitInterval": int(cherrystrap.GIT_INTERVAL),
                 "gitOverride": bool(cherrystrap.GIT_OVERRIDE)
-            },
-            "jira": {
-                "rsaPublicKey": cherrystrap.RSA_PUBLIC_KEY,
-                "rsaPrivateKey": cherrystrap.RSA_PRIVATE_KEY,
-                "jiraBaseUrl": cherrystrap.JIRA_BASE_URL,
-                "consumerKey": cherrystrap.CONSUMER_KEY,
-                "consumerSecret": cherrystrap.CONSUMER_SECRET
             }
         }
+
+        #===============================================================
+        # Import a variable injector from your app's __init__.py
+        try:
+            from jiraappy import injectApiConfigGet
+            configuration.update(injectApiConfigGet())
+        except Exception, e:
+            logger.debug("There was a problem injection application variables into API-GET: %s" % e)
+        #================================================================
+
         config = json.dumps(configuration)
         return config
 
@@ -129,7 +132,7 @@ class settings(object):
             cherrystrap.API_TOKEN = kwargs.pop('apiToken', None)
 
         if 'dbType' in kwargs:
-            cherrystrap.DATABASE_TYPE = kwargs.pop('dbType', 'sqlite')
+            cherrystrap.DATABASE_TYPE = kwargs.pop('dbType', '')
         if 'mysqlHost' in kwargs:
             cherrystrap.MYSQL_HOST = kwargs.pop('mysqlHost', 'localhost')
         if 'mysqlPort' in kwargs:
@@ -182,16 +185,14 @@ class settings(object):
         elif 'gitOverrideHidden' in kwargs:
             cherrystrap.GIT_OVERRIDE = kwargs.pop('gitOverrideHidden', False) == 'true'
 
-        if 'rsaPublicKey' in kwargs:
-            cherrystrap.RSA_PUBLIC_KEY = kwargs.pop('rsaPublicKey', None)
-        if 'rsaPrivateKey' in kwargs:
-            cherrystrap.RSA_PRIVATE_KEY = kwargs.pop('rsaPrivateKey', None)
-        if 'jiraBaseUrl' in kwargs:
-            cherrystrap.JIRA_BASE_URL = kwargs.pop('jiraBaseUrl', None)
-        if 'consumerKey' in kwargs:
-            cherrystrap.CONSUMER_KEY = kwargs.pop('consumerKey', None)
-        if 'consumerSecret' in kwargs:
-            cherrystrap.CONSUMER_SECRET = kwargs.pop('consumerSecret', None)
+        #===============================================================
+        # Import a variable injector from your app's __init__.py
+        try:
+            from jiraappy import injectApiConfigPut
+            kwargs, errorList = injectApiConfigPut(kwargs, errorList)
+        except Exception, e:
+            logger.debug("There was a problem injection application variables into API-PUT: %s" % e)
+        #================================================================
 
         if len(kwargs) != 0:
             for key, value in kwargs.items():
@@ -237,26 +238,24 @@ class log(object):
                     sortcolumn = int(value)
 
         # Fix for column reordering without having to install a plugin
-        if sortcolumn == 1:
-            sortcolumn = 2
-        elif sortcolumn == 2:
-            sortcolumn = 3
-        elif sortcolumn == 3:
-            sortcolumn = 1
+        newOrder = [0,2,3,1]
+        logArr = []
+        for line in cherrystrap.LOGLIST:
+            logList = [ line[i] for i in newOrder]
+            logArr.append(tuple(logList))
 
         filtered = []
         if search == "":
-            filtered = cherrystrap.LOGLIST[::]
+            filtered = logArr
         else:
-            filtered = list(set([row for row in cherrystrap.LOGLIST for column in row if search in column.lower()]))
+            filtered = list(set([row for row in logArr for column in row if search in column.lower()]))
 
         filtered.sort(key=lambda x:x[sortcolumn],reverse=sortdir == "desc")
 
         rows = filtered[start:(start+length)]
-        rows = [[row[0],row[2],row[3],row[1]] for row in rows]
 
         dict = {'draw': draw,
-                'recordsTotal':len(cherrystrap.LOGLIST),
+                'recordsTotal':len(logArr),
                 'recordsFiltered':len(filtered),
                 'data':rows,
                 }

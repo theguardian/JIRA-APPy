@@ -1,5 +1,6 @@
 <%!
     import cherrystrap
+    import jiraappy
 %>
 <html lang="en">
 <head>
@@ -57,10 +58,10 @@
             <li class="dropdown">
               <a href="#" class="dropdown-toggle" data-toggle="dropdown"><span class="glyphicon glyphicon-cog"></span> <b class="caret"></b></a>
               <ul class="dropdown-menu">
-                %if not cherrystrap.JIRA_LOGIN_STATUS:
+                %if not jiraappy.JIRA_LOGIN_STATUS:
                   <li><a href="/oauth_request"><span class="glyphicon glyphicon-transfer"></span>&nbsp;Connect to JIRA</a></li>
                 %else:
-                  <li><a href="/oauth_logout"><span class="glyphicon glyphicon-transfer"></span>&nbsp;Disconnect as ${cherrystrap.JIRA_LOGIN_USER}</a></li>
+                  <li><a href="/oauth_logout"><span class="glyphicon glyphicon-transfer"></span>&nbsp;Disconnect as ${jiraappy.JIRA_LOGIN_USER}</a></li>
                 %endif
                 <li><a href="/config"><span class="glyphicon glyphicon-wrench"></span>&nbsp;Settings</a></li>
                 <li><a href="/logs"><span class="glyphicon glyphicon-list-alt"></span>&nbsp;Log Viewer</a></li>

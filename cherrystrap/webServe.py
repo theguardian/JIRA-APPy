@@ -7,16 +7,18 @@ from templating import serve_template
 import threading, time
 
 import cherrystrap
+import jiraappy
 
-from cherrystrap import logger, formatter, database, backend, jiraInt
+from cherrystrap import logger, formatter, database
+from jiraappy import backend, jiraInt
 
 SESSION_KEY = '_cp_username'
 
 class WebInterface(object):
 
     def error_page_404(status, message, traceback, version):
-        msg = "%s - %s" % (status, message)
-        return serve_template(templatename="index.html", title="404 - Page Not Found", msg=msg)
+        status_msg = "%s - %s" % (status, message)
+        return serve_template(templatename="index.html", title="404 - Page Not Found", msg=status_msg)
     cherrypy.config.update({'error_page.404': error_page_404})
 
     def handle_error():
@@ -54,11 +56,11 @@ class WebInterface(object):
 
     @require()
     def oauth_logout(self):
-		cherrystrap.JIRA_OAUTH_TOKEN = None
-		cherrystrap.JIRA_OAUTH_SECRET = None
+		jiraappy.JIRA_OAUTH_TOKEN = None
+		jiraappy.JIRA_OAUTH_SECRET = None
 		cherrystrap.config_write()
-		cherrystrap.JIRA_LOGIN_STATUS = None
-		cherrystrap.JIRA_LOGIN_USER = None
+		jiraappy.JIRA_LOGIN_STATUS = None
+		jiraappy.JIRA_LOGIN_USER = None
 		status, msg = backend.ajaxMSG('success', 'Successfully logged out of JIRA OAuth')
 		return serve_template(templatename="index.html", title="Home", status=status, msg=msg)
     oauth_logout.exposed = True
@@ -79,7 +81,7 @@ class WebInterface(object):
     @require()
     def operations(self, script=None, issue_list_input=None):
         status, msg = '', ''
-        if cherrystrap.JIRA_LOGIN_STATUS:
+        if jiraappy.JIRA_LOGIN_STATUS:
             consumer, client = backend.stored_oauth()
 
             if request.method == 'POST':
@@ -159,8 +161,8 @@ class WebInterface(object):
         if str(request_type).lower() == 'xmlhttprequest':
             pass
         else:
-            msg = "This page exists, but is not accessible via web browser"
-            return serve_template(templatename="index.html", title="404 - Page Not Found", msg=msg)
+            status_msg = "This page exists, but is not accessible via web browser"
+            return serve_template(templatename="index.html", title="404 - Page Not Found", msg=status_msg)
 
         from cherrystrap import versioncheck
         versioncheck.checkGithub()
@@ -173,8 +175,8 @@ class WebInterface(object):
         if str(request_type).lower() == 'xmlhttprequest':
             pass
         else:
-            msg = "This page exists, but is not accessible via web browser"
-            return serve_template(templatename="index.html", title="404 - Page Not Found", msg=msg)
+            status_msg = "This page exists, but is not accessible via web browser"
+            return serve_template(templatename="index.html", title="404 - Page Not Found", msg=status_msg)
 
         cherrystrap.IGNORE_UPDATES = True
     ignoreUpdates.exposed = True
@@ -185,8 +187,8 @@ class WebInterface(object):
         if str(request_type).lower() == 'xmlhttprequest':
             pass
         else:
-            msg = "This page exists, but is not accessible via web browser"
-            return serve_template(templatename="index.html", title="404 - Page Not Found", msg=msg)
+            status_msg = "This page exists, but is not accessible via web browser"
+            return serve_template(templatename="index.html", title="404 - Page Not Found", msg=status_msg)
 
         return serve_template(templatename="ajaxUpdate.html")
     ajaxUpdate.exposed = True
