@@ -28,7 +28,7 @@ import time
 import random
 import hmac
 import binascii
-import httplib2
+from lib import httplib2
 
 from ._compat import PY3
 from ._compat import b
