@@ -34,7 +34,7 @@ def redirect_oauth():
             authorize_token_url = request_token_info['authorize_token_url']
             status, status_msg = ajaxMSG('success', 'JIRA Credentials recognized! Redirecting to JIRA login')
     except:
-        authorize_token_url = "home"
+        authorize_token_url = "index"
         status, status_msg = ajaxMSG('failure', 'Invalid Consumer Key, RSA Keys, or JIRA App Link - please check configuration')
 
     return authorize_token_url, status, status_msg
